@@ -36,3 +36,7 @@ pip install pandas tabulate tkinter
 
 4. **Save your changes:**
    - Click on the "Save" button to write the changes back to the `.bin` file.
+  
+## Examples
+![image](https://github.com/user-attachments/assets/afa156c7-219d-4039-b5ac-8e7e8115126d)
+2x deformation on the Annihilator
