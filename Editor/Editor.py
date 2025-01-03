@@ -18,7 +18,7 @@ def read_sensor_data(filepath, start_offset, step, num_sensors=20):
     try:
         with open(filepath, "rb") as f:
             for i in range(num_sensors):
-                offset = start_offset + i * step  # Corrected offset calculation
+                offset = start_offset + i * (step + 0x10)  # Includes padding correction
                 f.seek(offset)
                 # Read 6 floats (6 * 4 bytes = 24 bytes)
                 data = f.read(24)
@@ -33,7 +33,7 @@ def write_sensor_data(filepath, start_offset, step, sensors):
     try:
         with open(filepath, "r+b") as f:
             for i, sensor in enumerate(sensors):
-                offset = start_offset + i * step  # Corrected offset calculation
+                offset = start_offset + i * (step + 0x10)
                 f.seek(offset)
                 # Write 6 floats as big-endian
                 f.write(struct.pack(">6f", *sensor))
