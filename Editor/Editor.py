@@ -1,8 +1,12 @@
 import struct
 import os
-from tkinter import Tk, filedialog, Toplevel, Label, Button, Entry, messagebox
-import pandas as pd
-from tabulate import tabulate
+from tkinter import Tk, filedialog, Label, Button, Entry, messagebox
+
+# Global constants
+START_OFFSET = 0x120
+STEP = 0x30
+NUM_SENSORS = 20
+SENSOR_DATA_SIZE = 24  # 6 floats * 4 bytes each
 
 DEFAULT_SENSOR_VALUE = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 SENSOR_POSITIONS = [
@@ -12,141 +16,204 @@ SENSOR_POSITIONS = [
     "back_upper_right", "back_lower_middle", "back_upper_middle", "back_lower_left", "back_upper_left"
 ]
 
-def read_sensor_data(filepath, start_offset, step, num_sensors=20):
-    """Reads sensor data from the .dat file."""
+def read_sensor_data(filepath):
     sensors = []
     try:
         with open(filepath, "rb") as f:
-            for i in range(num_sensors):
-                offset = start_offset + i * (step + 0x10)  # Includes padding correction
+            for i in range(NUM_SENSORS):
+                offset = START_OFFSET + i * (STEP + 0x10)
                 f.seek(offset)
-                # Read 6 floats (6 * 4 bytes = 24 bytes)
-                data = f.read(24)
+                data = f.read(SENSOR_DATA_SIZE)
                 sensors.append(struct.unpack(">6f", data))
         return sensors
     except Exception as e:
-        print(f"Error reading file: {e}")
-        return []
+        print(f"Error reading file {filepath}: {e}")
+        return None
 
-def write_sensor_data(filepath, start_offset, step, sensors):
-    """Writes sensor data back to the .dat file."""
+def write_sensor_data(filepath, sensors):
     try:
         with open(filepath, "r+b") as f:
             for i, sensor in enumerate(sensors):
-                offset = start_offset + i * (step + 0x10)
+                offset = START_OFFSET + i * (STEP + 0x10)
                 f.seek(offset)
-                # Write 6 floats as big-endian
                 f.write(struct.pack(">6f", *sensor))
-        print(f"Successfully updated {filepath}")
+        return True
     except Exception as e:
-        print(f"Error writing file: {e}")
+        print(f"Error writing file {filepath}: {e}")
+        return False
 
-def display_sensors_table(sensors):
-    """Displays the sensor data in a table format."""
-    df = pd.DataFrame(sensors, columns=["Value 1", "Value 2", "Value 3", "Value 4", "Value 5", "Value 6"])
-    df["Position"] = SENSOR_POSITIONS
-    df.index.name = "Sensor ID"
-    print(tabulate(df, headers="keys", tablefmt="pretty"))
+class SensorEditor:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Sensor Data Editor")
+        self.root.geometry("700x900")
+        
+        self.current_filepath = ""
+        self.batch_files = []
+        self.entries = []
+        self.sensors = []
+        self.original_sensors = []
 
-def main():
-    root = Tk()
-    root.title("Sensor Data Editor")
-    root.geometry("700x800")
+        # Create UI elements
+        self.create_controls()
+        self.batch_controls_visible(False)
+        self.single_file_controls_visible(False)
 
-    original_sensors = []
-    sensors = []
-    entries = []  # 20 sensors x 6 values
+    def create_controls(self):
+        # Top controls
+        Button(self.root, text="Open File", command=self.open_file).grid(row=0, column=0, padx=5, pady=5)
+        Button(self.root, text="Open Folder", command=self.open_folder).grid(row=0, column=1, padx=5, pady=5)
 
-    def open_file():
-        nonlocal sensors, original_sensors
-        filepath = filedialog.askopenfilename(
-            title="Select .bin or .dat file",
-            filetypes=[("BIN/DAT files", "*.bin;*.dat"), ("All files", "*.*")],
-        )
-        if not filepath:
-            return
-        # Read data
-        num_sensors = 20
-        start_offset = 0x120
-        step = 0x30
-        sensors = read_sensor_data(filepath, start_offset, step, num_sensors)
-        original_sensors = [list(s) for s in sensors]
-        show_sensors_table(filepath, start_offset, step)
+        # Batch controls
+        self.batch_multiplier_label = Label(self.root, text="Batch Multiplier:")
+        self.batch_multiplier_entry = Entry(self.root, width=10)
+        self.batch_apply_btn = Button(self.root, text="Apply to All Files", command=self.batch_apply_multiplier)
 
-    def show_sensors_table(filepath, start_offset, step):
-        # Clear old widgets except open_file_btn
-        for widget in root.grid_slaves():
-            if widget != open_file_btn:
+        # Single file controls (initially hidden)
+        self.single_multiplier_label = Label(self.root, text="Multiply Factor:")
+        self.single_multiplier_entry = Entry(self.root, width=10)
+        self.single_apply_btn = Button(self.root, text="Apply", command=self.apply_single_multiplier)
+        self.reset_all_btn = Button(self.root, text="Reset All", command=self.reset_all)
+        self.save_btn = Button(self.root, text="Save", command=self.save_file)
+
+    def batch_controls_visible(self, visible):
+        if visible:
+            self.batch_multiplier_label.grid(row=1, column=0, padx=5, pady=5)
+            self.batch_multiplier_entry.grid(row=1, column=1, padx=5, pady=5)
+            self.batch_apply_btn.grid(row=1, column=2, padx=5, pady=5)
+        else:
+            self.batch_multiplier_label.grid_remove()
+            self.batch_multiplier_entry.grid_remove()
+            self.batch_apply_btn.grid_remove()
+
+    def single_file_controls_visible(self, visible):
+        if visible:
+            self.single_multiplier_label.grid(row=25, column=0, padx=5, pady=5)
+            self.single_multiplier_entry.grid(row=25, column=1, padx=5, pady=5)
+            self.single_apply_btn.grid(row=25, column=2, padx=5, pady=5)
+            self.reset_all_btn.grid(row=24, column=0, pady=5)
+            self.save_btn.grid(row=24, column=1, pady=5)
+        else:
+            self.single_multiplier_label.grid_remove()
+            self.single_multiplier_entry.grid_remove()
+            self.single_apply_btn.grid_remove()
+            self.reset_all_btn.grid_remove()
+            self.save_btn.grid_remove()
+
+    def clear_sensor_widgets(self):
+        for widget in self.root.grid_slaves():
+            if widget.grid_info()["row"] > 3 and widget not in [
+                self.single_multiplier_label, self.single_multiplier_entry, 
+                self.single_apply_btn, self.reset_all_btn, self.save_btn
+            ]:
                 widget.destroy()
+        self.entries = []
 
-        # Draw sensor table starting from row=1
-        for r in range(20):
-            Label(root, text=SENSOR_POSITIONS[r], width=15, anchor="w").grid(row=r+1, column=0, padx=5, pady=3)
+    def open_file(self):
+        filepath = filedialog.askopenfilename(filetypes=[("DAT/BIN files", "*.dat *.DAT *.bin *.BIN")])
+        if filepath:
+            self.process_single_file(filepath)
+            self.batch_controls_visible(False)
+            self.single_file_controls_visible(True)
+
+    def open_folder(self):
+        folderpath = filedialog.askdirectory(title="Select Root Folder")
+        if not folderpath:
+            return
+        
+        self.batch_files = []
+        for root_dir, dirs, files in os.walk(folderpath):
+            if "StreamedDeformationSpec" in dirs:
+                spec_dir = os.path.join(root_dir, "StreamedDeformationSpec")
+                for file in os.listdir(spec_dir):
+                    if file.lower().endswith(('.dat', '.bin')):
+                        self.batch_files.append(os.path.join(spec_dir, file))
+        
+        self.clear_sensor_widgets()
+        self.single_file_controls_visible(False)
+        self.batch_controls_visible(True)
+        messagebox.showinfo("Files Found", f"Found {len(self.batch_files)} StreamedDeformationSpec files")
+
+    def process_single_file(self, filepath):
+        self.current_filepath = filepath
+        self.clear_sensor_widgets()
+        
+        sensors = read_sensor_data(filepath)
+        if not sensors:
+            return
+
+        self.sensors = sensors
+        self.original_sensors = [list(s) for s in sensors]
+        
+        for r in range(NUM_SENSORS):
+            Label(self.root, text=SENSOR_POSITIONS[r], width=15, anchor="w").grid(row=r+4, column=0, padx=5, pady=3)
             row_entries = []
             for c in range(6):
-                e = Entry(root, width=10)
-                e.grid(row=r+1, column=c+1, padx=5, pady=3)
-                e.insert(0, f"{sensors[r][c]:.4f}")  # Display with 4 decimals
+                e = Entry(self.root, width=10)
+                e.grid(row=r+4, column=c+1, padx=5, pady=3)
+                e.insert(0, f"{self.sensors[r][c]:.4f}")
                 row_entries.append(e)
-            entries.append(row_entries)
+            self.entries.append(row_entries)
+            Button(self.root, text="Reset", command=lambda rr=r: self.reset_single_sensor(rr)).grid(row=r+4, column=7, padx=5, pady=3)
 
-            def make_reset_sensor(rr=r):
-                def reset_sensor():
-                    for c2 in range(6):
-                        entries[rr][c2].delete(0, "end")
-                        entries[rr][c2].insert(0, f"{original_sensors[rr][c2]:.4f}")
-                return reset_sensor
-            Button(root, text="Reset", command=make_reset_sensor()).grid(row=r+1, column=7, padx=5, pady=3)
+    def reset_single_sensor(self, row):
+        for c in range(6):
+            self.entries[row][c].delete(0, "end")
+            self.entries[row][c].insert(0, f"{self.original_sensors[row][c]:.4f}")
 
-        # Buttons row at row=22
-        Button(root, text="Reset All", command=reset_all).grid(row=22, column=0, pady=5)
-
-        def save():
-            for r in range(20):
-                sensors[r] = tuple(float(entries[r][c].get()) for c in range(6))
-            write_sensor_data(filepath, start_offset, step, sensors)
-            messagebox.showinfo("Saved", "All changes saved to file.")
-
-        Button(root, text="Save", command=save).grid(row=22, column=1, pady=5)
-
-        # Multiply All widgets
-        Label(root, text="Multiply Factor:").grid(row=23, column=0, padx=5, pady=5)
-        factor_entry = Entry(root, width=10)
-        factor_entry.grid(row=23, column=1, padx=5, pady=5)
-        
-        def multiply_all():
-            factor_str = factor_entry.get()
-            try:
-                factor = float(factor_str)
-            except ValueError:
-                messagebox.showerror("Error", "Please enter a valid number for the factor.")
-                return
-
-            for r in range(20):
-                for c in range(6):
-                    entry = entries[r][c]
-                    current_value = entry.get()
-                    try:
-                        current_float = float(current_value)
-                    except ValueError:
-                        messagebox.showerror("Error", f"Invalid value in {SENSOR_POSITIONS[r]}, value {c+1}: {current_value}")
-                        return
-                    new_value = current_float * factor
-                    entry.delete(0, "end")
-                    entry.insert(0, f"{new_value:.4f}")
-
-        Button(root, text="Apply", command=multiply_all).grid(row=23, column=2, padx=5, pady=5)
-
-    def reset_all():
+    def reset_all(self):
         for r in range(20):
             for c in range(6):
-                entries[r][c].delete(0, "end")
-                entries[r][c].insert(0, f"{original_sensors[r][c]:.3f}")
+                self.entries[r][c].delete(0, "end")
+                self.entries[r][c].insert(0, f"{self.original_sensors[r][c]:.4f}")
 
-    open_file_btn = Button(root, text="Open File", command=open_file)
-    open_file_btn.grid(row=0, column=0, padx=10, pady=10)
+    def save_file(self):
+        for r in range(NUM_SENSORS):
+            self.sensors[r] = tuple(float(self.entries[r][c].get()) for c in range(6))
+        if write_sensor_data(self.current_filepath, self.sensors):
+            messagebox.showinfo("Saved", "All changes saved to file")
 
-    root.mainloop()
+    def apply_single_multiplier(self):
+        try:
+            factor = float(self.single_multiplier_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Invalid multiplier")
+            return
+
+        for r in range(20):
+            for c in range(6):
+                entry = self.entries[r][c]
+                current_value = float(entry.get())
+                entry.delete(0, "end")
+                entry.insert(0, f"{current_value * factor:.4f}")
+
+    def batch_apply_multiplier(self):
+        if not self.batch_files:
+            messagebox.showwarning("No Files", "Select a folder first")
+            return
+
+        try:
+            multiplier = float(self.batch_multiplier_entry.get())
+        except ValueError:
+            messagebox.showerror("Error", "Invalid multiplier")
+            return
+
+        success = 0
+        for filepath in self.batch_files:
+            sensors = read_sensor_data(filepath)
+            if not sensors:
+                continue
+            
+            modified = [tuple(val * multiplier for val in s) for s in sensors]
+            if write_sensor_data(filepath, modified):
+                success += 1
+
+            if filepath == self.current_filepath:
+                self.process_single_file(filepath)
+
+        messagebox.showinfo("Complete", f"Processed {len(self.batch_files)} files\nSuccess: {success}")
 
 if __name__ == "__main__":
-    main()
+    root = Tk()
+    app = SensorEditor(root)
+    root.mainloop()
