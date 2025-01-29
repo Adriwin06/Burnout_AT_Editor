@@ -1,42 +1,76 @@
-# Burnout_AT_Editor
+# Burnout Paradise AT Editor
 
-Burnout_AT_Editor is a tool designed to edit the StreamedDeformationSpec of Burnout Paradise cars, allowing you to modify sensor data related to car deformation within the game.
+## Installation
+You can either download the latest release from the [Releases](https://github.com/Adriwin06/Burnout_AT_Editor/releases) but it might be outdated or you can clone the repository and run it with Python.
 
-## Features
+## Prerequisites
 
-- **Read and Display Sensor Data:** Easily access sensor data from `.bin` files extracted from the AT files of Burnout Paradise cars.
-- **Graphical Interface:** Intuitive GUI for editing sensor values.
-- **Reset Sensors:** Restore individual sensors or all sensors to their values when you opened the file.
-- **Save Changes:** Apply and save your modifications back to the `.bin` files.
+### 1. YAP Tool (Required for Batch Files)
+**You must download these files first:**  
+🔗 [Download YAP from GitHub](https://github.com/burninrubber0/YAP/releases)  
+*(Credit to burninrubber0 for the incredible tool, as always)*
 
-## Requirements
+**After downloading:**
+1. Extract these files where the batch files are:
+   - `yap.exe`
+   - `Qt6Core.dll`
+2. Place the batch files (`extract_vehicles.bat` and `repack_vehicles.bat`) in the **same folder** as YAP
 
-- **Python 3.x**
-- **pandas**
-- **tabulate**
-- **tkinter**
-
-```bash	
-pip install pandas tabulate tkinter
+### 2. Python Requirements
+```bash
+pip install pandas tabulate
 ```
 
-## Usage
+## Setup Guide
 
-1. **Run the application:**
-   
-   ```bash
-   python main.py
+1. **Folder Structure**  
+   Create this structure (❗ YAP files and batch files must be together):
+   ```
+   Burnout_AT_Toolkit/
+   ├── yap.exe          # From YAP download
+   ├── Qt6Core.dll      # From YAP download
+   ├── extract_vehicles.bat
+   ├── repack_vehicles.bat
+   └── Burnout_AT_Editor/
+       ├── main.py
+       └── (other python files)
    ```
 
-2. **Open a `.bin` file:**
-   - Click on the "Open File" button and select your Burnout Paradise car `.bin` file.
+2. **Game Files Backup**  
+   Always keep a copy of your original `VEHICLES` folder!
 
-3. **Edit sensor values:**
-   - Use the graphical interface to modify sensor data as desired.
+---
 
-4. **Save your changes:**
-   - Click on the "Save" button to write the changes back to the `.bin` file.
-  
-## Examples
-![image](https://github.com/user-attachments/assets/afa156c7-219d-4039-b5ac-8e7e8115126d)
-2x deformation on the Annihilator
+## Workflow
+
+### 1. Extract Bundles
+```bash
+Run extract_vehicles.bat
+➜ Source: Game's VEHICLES/AT folder
+➜ Destination: Create new folder (e.g., MyMods/Extracted)
+```
+
+### 2. Edit Sensors Values from StreamedDeformationSpecs files
+```bash
+1. Run the tool
+2. You can select a specific vehicle or the whole folder that contains extracted files
+⚠️ If you select the folder, you will only be able to multiply the values by a factor.
+3. Modify values & save
+```
+
+### 3. Repack Bundles
+```bash
+Run repack_vehicles.bat
+➜ Source: MyMods/Extracted
+➜ Destination: Create MyMods/Repacked
+```
+
+### 4. Install Modified Files
+Copy all `.BIN` files from `Repacked` to the game's `VEHICLES` folder
+
+---
+
+## ❗ Important Notes
+- Without YAP files, the batch scripts **will not work**
+- YAP handles the actual bundle extraction/repacking
+- the editor only modifies values in extracted StreamedDeformationSpecs files
