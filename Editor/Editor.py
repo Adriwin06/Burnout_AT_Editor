@@ -51,12 +51,7 @@ def display_sensors_table(sensors):
 def main():
     root = Tk()
     root.title("Sensor Data Editor")
-    root.geometry("700x750")
-
-    # Add an icon to the window
-    # icon_path = "icon.ico"
-    # if os.path.exists(icon_path):
-    #     root.iconbitmap(icon_path)
+    root.geometry("700x800")
 
     original_sensors = []
     sensors = []
@@ -65,8 +60,8 @@ def main():
     def open_file():
         nonlocal sensors, original_sensors
         filepath = filedialog.askopenfilename(
-            title="Select .bin file",
-            filetypes=[("BIN files", "*.bin"), ("All files", "*.*")],
+            title="Select .bin or .dat file",
+            filetypes=[("BIN/DAT files", "*.bin;*.dat"), ("All files", "*.*")],
         )
         if not filepath:
             return
@@ -113,6 +108,34 @@ def main():
             messagebox.showinfo("Saved", "All changes saved to file.")
 
         Button(root, text="Save", command=save).grid(row=22, column=1, pady=5)
+
+        # Multiply All widgets
+        Label(root, text="Multiply Factor:").grid(row=23, column=0, padx=5, pady=5)
+        factor_entry = Entry(root, width=10)
+        factor_entry.grid(row=23, column=1, padx=5, pady=5)
+        
+        def multiply_all():
+            factor_str = factor_entry.get()
+            try:
+                factor = float(factor_str)
+            except ValueError:
+                messagebox.showerror("Error", "Please enter a valid number for the factor.")
+                return
+
+            for r in range(20):
+                for c in range(6):
+                    entry = entries[r][c]
+                    current_value = entry.get()
+                    try:
+                        current_float = float(current_value)
+                    except ValueError:
+                        messagebox.showerror("Error", f"Invalid value in {SENSOR_POSITIONS[r]}, value {c+1}: {current_value}")
+                        return
+                    new_value = current_float * factor
+                    entry.delete(0, "end")
+                    entry.insert(0, f"{new_value:.4f}")
+
+        Button(root, text="Apply", command=multiply_all).grid(row=23, column=2, padx=5, pady=5)
 
     def reset_all():
         for r in range(20):
