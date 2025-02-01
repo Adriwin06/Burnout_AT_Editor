@@ -39,16 +39,20 @@ pip install pandas tabulate
 2. **Game Files Backup**  
    Always keep a copy of your original `VEHICLES` folder!
 
----
 
 ## Workflow
 
 ### 1. Extract Bundles
+#### 1.1 Extract *all* VEHICLES/AT Bundles
 ```bash
 Run extract_vehicles.bat
 ➜ Source: Game's VEHICLES/AT folder
 ➜ Destination: Create new folder (e.g., MyMods/Extracted)
 ```
+
+#### 1.2 Extract *specific* VEHICLES/AT Bundles
+You can use anything you want, like BundleManager or YAP.
+With BundleManager, you have to open the AT file in bundle mode and export the header (which is the StreamedDeformationSpecs file).
 
 ### 2. Edit Sensors Values from StreamedDeformationSpecs files
 ```bash
@@ -59,18 +63,27 @@ Run extract_vehicles.bat
 ```
 
 ### 3. Repack Bundles
+#### 3.1 Repack *all* VEHICLES/AT Bundles
 ```bash
 Run repack_vehicles.bat
 ➜ Source: MyMods/Extracted
 ➜ Destination: Create MyMods/Repacked
 ```
+⚠️ It will only work if it is the correct folder structure, so only use it if you used te batch extract to extract the files.
+
+#### 3.2 Repack *specific* VEHICLES/AT Bundles
+If you used BundleManager to extract the files, you can just have to reimport the edited header file back into the AT file.
 
 ### 4. Install Modified Files
 Copy all `.BIN` files from `Repacked` to the game's `VEHICLES` folder
 
----
+  
+## Examples
+![image](https://github.com/user-attachments/assets/afa156c7-219d-4039-b5ac-8e7e8115126d)
+2x deformation on the Annihilator
+
 
 ## ❗ Important Notes
 - Without YAP files, the batch scripts **will not work**
-- YAP handles the actual bundle extraction/repacking
-- the editor only modifies values in extracted StreamedDeformationSpecs files
+- YAP handles the actual bundle extraction/repacking for the batch extract script
+- The editor only modifies values in extracted StreamedDeformationSpecs files
