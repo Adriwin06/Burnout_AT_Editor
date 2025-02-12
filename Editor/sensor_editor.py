@@ -3,6 +3,7 @@ import copy
 import customtkinter
 from tkinter import filedialog, messagebox
 from sensor_io import read_sensor_data, write_sensor_data, SENSOR_POSITIONS, NUM_SENSORS
+from data import car_name
 
 class SensorEditor:
     def __init__(self, root):
@@ -35,35 +36,44 @@ class SensorEditor:
         """Create and layout the main UI controls (top bar, left sidebar, sensor detail area)."""
         # Top bar
         top_frame = customtkinter.CTkFrame(self.root)
-        top_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(20,10))
-        top_frame.grid_columnconfigure(2, weight=1)  # Push buttons to the left
+        top_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=(10,5))
+        top_frame.grid_columnconfigure(3, weight=1)  # Ensure it stretches
 
         self.open_file_btn = customtkinter.CTkButton(top_frame, text="Open File", command=self.open_file, width=120)
-        self.open_file_btn.grid(row=0, column=0, padx=(10,5), pady=10)
-        
+        self.open_file_btn.grid(row=0, column=0, padx=(10,5), pady=5)
+
         self.open_folder_btn = customtkinter.CTkButton(top_frame, text="Open Folder", command=self.open_folder, width=120)
-        self.open_folder_btn.grid(row=0, column=1, padx=5, pady=10)
+        self.open_folder_btn.grid(row=0, column=1, padx=5, pady=5)
 
-        # Batch controls for folder batch processing (placed below the top bar)
-        self.batch_multiplier_label = customtkinter.CTkLabel(self.root, text="Batch Float Multiplier:", anchor="e")
-        self.batch_multiplier_entry = customtkinter.CTkEntry(self.root, width=120)
-        self.batch_apply_btn = customtkinter.CTkButton(self.root, text="Apply to All Files", 
-                                                      command=self.batch_apply_multiplier, width=120)
-        # (These controls will be shown only during folder batch processing.)
+        self.car_name_label = customtkinter.CTkLabel(top_frame, text="", font=("Arial", 14), anchor="w")
+        self.car_name_label.grid(row=0, column=3, padx=10, pady=5, sticky="e")
 
-        # Left sidebar for sensor list
+        # Batch controls container
+        self.batch_frame = customtkinter.CTkFrame(self.root)
+        self.batch_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=5)
+        self.batch_frame.grid_columnconfigure(1, weight=1)
+
+        self.batch_multiplier_label = customtkinter.CTkLabel(self.batch_frame, text="Batch Sensors' Direction Params Multiplier:", anchor="w")
+        self.batch_multiplier_label.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+
+        self.batch_multiplier_entry = customtkinter.CTkEntry(self.batch_frame, width=120)
+        self.batch_multiplier_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+
+        self.batch_apply_btn = customtkinter.CTkButton(self.batch_frame, text="Apply to All Files", 
+                                                    command=self.batch_apply_multiplier, width=120)
+        self.batch_apply_btn.grid(row=0, column=2, padx=5, pady=5, sticky="w")
+
+        # Left sidebar
         self.left_frame = customtkinter.CTkFrame(self.root)
-        self.left_frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0,20))
+        self.left_frame.grid(row=2, column=0, sticky="nsw", padx=20, pady=(5,10))
         self.left_frame.grid_rowconfigure(0, weight=1)
-        self.left_frame.grid_columnconfigure(0, weight=1)
 
-        # Scrollable sensor list in the sidebar
         self.sensor_scrollable_frame = customtkinter.CTkScrollableFrame(self.left_frame, width=280)
-        self.sensor_scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.sensor_scrollable_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
 
-        # Right content area for sensor details
+        # Right content area
         self.right_frame = customtkinter.CTkFrame(self.root)
-        self.right_frame.grid(row=2, column=1, sticky="nsew", padx=(0,20), pady=(0,20))
+        self.right_frame.grid(row=2, column=1, sticky="nsew", padx=(0,20), pady=(5,10))
         self.right_frame.grid_columnconfigure(1, weight=1)
         
     def create_bottom_controls(self):
@@ -96,13 +106,9 @@ class SensorEditor:
     def batch_controls_visible(self, visible):
         """Toggle visibility of folder batch processing controls."""
         if visible:
-            self.batch_multiplier_label.grid(row=1, column=0, padx=5, pady=5, sticky="w")
-            self.batch_multiplier_entry.grid(row=1, column=1, padx=5, pady=5, sticky="w")
-            self.batch_apply_btn.grid(row=1, column=2, padx=5, pady=5, sticky="w")
+            self.batch_frame.grid()
         else:
-            self.batch_multiplier_label.grid_remove()
-            self.batch_multiplier_entry.grid_remove()
-            self.batch_apply_btn.grid_remove()
+            self.batch_frame.grid_remove()
             
     def sensor_detail_visible(self, visible):
         """Toggle visibility of the sensor detail panels and the bottom controls.
@@ -256,10 +262,10 @@ class SensorEditor:
         sensor_button_frame = customtkinter.CTkFrame(content_frame)
         sensor_button_frame.grid(row=current_row, column=0, columnspan=7, sticky="ew", pady=15)
         buttons = [
+            ("< Previous Sensor", self.prev_sensor),
             ("Reset Sensor", self.reset_sensor),
             ("Save Sensor", self.save_sensor),
-            ("Previous Sensor", self.prev_sensor),
-            ("Next Sensor", self.next_sensor)
+            ("Next Sensor >", self.next_sensor)
         ]
         for i, (text, command) in enumerate(buttons):
             btn = customtkinter.CTkButton(sensor_button_frame, text=text, command=command, width=120)
@@ -398,6 +404,7 @@ class SensorEditor:
             self.process_single_file(filepath)
             self.batch_controls_visible(False)
             self.sensor_detail_visible(True)
+            self.update_car_name_label(filepath)
         
     def open_folder(self):
         """Open a folder dialog and find all sensor files for batch processing."""
@@ -415,6 +422,21 @@ class SensorEditor:
         self.sensor_detail_visible(False)
         self.batch_controls_visible(True)
         messagebox.showinfo("Files Found", f"Found {len(self.batch_files)} StreamedDeformationSpec files")
+        self.car_name_label.configure(text=f"Editing {len(self.batch_files)} StreamedDeformationSpec files in {folderpath}.")
+
+    def update_car_name_label(self, filepath):
+        """Update the car name label based on the file path."""
+        parts = filepath.split('/')
+        car_id = next((part.split('_')[1] for part in parts if 'VEH_' in part and '_' in part), None)
+
+        if car_id and car_id.endswith("BIN"):
+            car_id = car_id[:-3]
+
+        if car_id and car_id in car_name:
+            self.car_name_label.configure(text=f"Car: {car_name[car_id]}")
+        else:
+            filename = os.path.basename(filepath)
+            self.car_name_label.configure(text=f"File: {filename}")
         
     def process_single_file(self, filepath):
         """Load and process a single sensor file.
@@ -434,7 +456,7 @@ class SensorEditor:
         self.load_sensor_details(0)
         
     def batch_apply_multiplier(self):
-        """Apply multiplier to all float values in all files in batch mode (folder batch processing)."""
+        """Apply multiplier to sensor directions in all files in batch mode (folder batch processing)."""
         if not self.batch_files:
             messagebox.showwarning("No Files", "Select a folder first")
             return
@@ -451,7 +473,7 @@ class SensorEditor:
             modified_sensors = []
             for sensor in sensors:
                 sensor["maDirectionParams"] = tuple(val * multiplier for val in sensor["maDirectionParams"])
-                sensor["mfRadius"] = sensor["mfRadius"] * multiplier
+                # mfRadius remains unchanged.
                 modified_sensors.append(sensor)
             if write_sensor_data(filepath, modified_sensors):
                 success += 1
